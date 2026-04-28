@@ -21,7 +21,7 @@ running = False
 switched = False
 menu = False
 
-with open('pomodoros.txt', 'r') as p:
+with open('pomodoros.txt', 'r') as p: #The pomodoro file and the options file are VERY identical. I'm currently working on it to fit into one file
     lines = p.readlines()
     parts = [line.split() for line in lines if line.strip()]
     dates = {datetime.date.fromisoformat(line[0]): line for line in parts}
