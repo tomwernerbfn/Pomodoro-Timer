@@ -13,6 +13,8 @@ git clone https://github.com/tomwernerbfn/Pomodoro-Timer.git cd pomodoro-timer p
 
 # Updates
 - Updated small details in code for better smoothness
+- Added quotes for motivation
+- Improved the structure in the code (No more global mess)
 *Currently working on more*
 
 # About
