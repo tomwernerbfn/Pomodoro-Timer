@@ -15,7 +15,7 @@ git clone https://github.com/tomwernerbfn/Pomodoro-Timer.git cd pomodoro-timer p
 - Updated small details in code for better smoothness
 - Added quotes for motivation
 - Improved the structure in the code (No more global mess)
-*Currently working on more*
+- *Currently working on more*
 
 # About
 This is my first project with REAL GUI (customtkinter) and I'm super proud of it! I never thought that I would be able to do something like this and actually understand 90% of it. For very advanced programmers, this would be light work. For me, it was hard work and mostly passion, and I hope that you can see it too. I would be so thankful if you found the time reading this little note and maybe even testing my timer, it means the whole world to me! Eventually, you can even track your study sessions and get a higher streak than me?🤔 Feel free to call out errors!
