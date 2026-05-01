@@ -1,151 +1,291 @@
 from tkinter import *
 import customtkinter
 import datetime
+import random
+
 try:
-    import winsound #ONLY FOR WINDOWS
-except Exception:
-    print("sound not possible because of an operating system error!".upper())
+    import winsound  # ONLY FOR WINDOWS
+except ImportError:
+    winsound = None
+    print("SOUND NOT POSSIBLE BECAUSE OF AN OPERATING SYSTEM ERROR!")
 
-customtkinter.set_appearance_mode("dark") #Change to 'light' if you like
-customtkinter.set_default_color_theme("blue") #Choose any color you want
 
-root = customtkinter.CTk()
+QUOTES = {
+    'Franklin D. Roosevelt': "'The only thing we have to fear is fear itself.'",
+    'Mahatma Gandhi': "'Be the change that you wish to see in the world.'",
+    'Martin Luther King Jr.': "'In the end, we will remember not the words of our enemies, but the silence of our friends.'",
+    'Ralph Waldo Emerson': "'To be yourself in a world that is constantly trying to make you something else is the greatest accomplishment.'",
+    'James Baldwin': "'Not everything that is faced can be changed, but nothing can be changed until it's faced.'",
+    'Albert Einstein': "'Two things are infinite: the universe and human stupidity; and I'm not sure about the universe.'",
+    'Mother Teresa': "'If you judge people, you have no time to love them.'",
+    'Steve Jobs': "'The only way to do great work is to love what you do.'",
+    'Confucius': "'It does not matter how slowly you go as long as you do not stop.'",
+    'Zig Ziglar': "'What you get by achieving your goals is not as important as what you become by achieving your goals.'",
+    'Abraham Lincoln': "'Nearly all men can stand adversity, but if you want to test a man's character, give him power.'",
+    'John C. Maxwell': "'A leader is one who knows the way, goes the way, and shows the way.'",
+    'Eleanor Roosevelt': "'Do what you feel in your heart to be right - for you'll be criticized anyway.'",
+    'Ralph Nader': "'The function of leadership is to produce more leaders, not more followers.'",
+    'Peter Ducker': "'Management is doing things right; leadership is doing the right things.'",
+    'John F. Kennedy': "'Leadership and learning are indispensable to each other.'",
+    'Martin Luther King Jr.': "'A genuine leader is not a searcher for consensus but a molder of consensus.'",
+    'Ronald Reagan': "'The greatest leader is not necessarily the one who does the greatest things; he is the one that gets the people to do the greatest things.'",
+    'Albert Schweitzer': "'Example is not the main thing in influencing others. It is the only thing.'",
+}
 
-root.title('Pomodoro Timer')
-root.geometry('700x400')
 
-yesterday = datetime.timedelta(days=1)
-today = datetime.date.today()
+class PomodoroApp:
+    def __init__(self, root):
+        self.root = root
+        self.root.title('Pomodoro Timer')
+        self.root.geometry('700x400')
 
-running = False
-switched = False
-menu = False
+        self.running = False
+        self.switched = False
+        self.menu = False
+        self.num = 0
+        self.extent = 0
+        self.update_step = 0
+        self.today = datetime.date.today()
+        self.canvas_bg = "#252525"
+        self.opt_bg = "#2b2b2b"
 
-with open('pomodoros.txt', 'r') as p: #The pomodoro file and the options file are VERY identical. I'm currently working on it to fit into one file
-    lines = p.readlines()
-    parts = [line.split() for line in lines if line.strip()]
-    dates = {datetime.date.fromisoformat(line[0]): line for line in parts}
-    #STREAK
-    if today in dates:
-        pomodoro_val = int(dates[today][1])
-    else:
-        pomodoro_val = 0
+        customtkinter.set_appearance_mode("dark")
+        customtkinter.set_default_color_theme("blue")
 
-def timer(): #WORKING ON THE GLOBAL MESS
-    global num, running, pomodoro_val, today, switched, extent, update
-    if running and num != 0:
-        label.configure(text=num)
-        num -= 1
-        canvas.itemconfig(arc, extent=extent) #Making the blue progress bar shrink every second
-        extent -= update
-        root.after(1000, timer)
-    elif running and num == 0:
-        running = False
-        canvas.itemconfig(arc, extent=extent) #Hiding the blue progress bar
-        label.configure(text=num)
-        start.configure(text="START")
-        winsound.Beep(1000, 300) #ONLY FOR WINDOWS
-        winsound.Beep(1000, 300) #ONLY FOR WINDOWS
-        with open('pomodoros.txt', 'w') as a:
-            pomodoro_val += 1
-            a.write(f'{today} {pomodoro_val}')
-            pomodoro.configure(text=f"Today's completed Pomodoros: {pomodoro_val} Pomodoros!", font=("Helvetica", 20))
+        key, value = random.choice(list(QUOTES.items()))
+        self.quo = f"{value}     - {key}"
+
+        self.pomodoro_val = self._load_pomodoro_count()
+
+        self._setup_canvas()
+        self._setup_widgets()
+        self._place_widgets()
+
+    def _load_pomodoro_count(self):
         try:
-            with open('options.txt', 'a') as o:
-                time = int(entry.get())
-        except ValueError:
-            entry.configure(placeholder_text='Enter a number!')
-            return
-        else:
-            o.write(f'Date: {today} for {time} seconds!\n')
-        label.place_forget()
-        entry.place(relx=0.5, rely=0.5, anchor=customtkinter.CENTER)
-        switched = False
+            with open('pomodoros.txt', 'r') as f:
+                lines = f.readlines()
+            parts = [line.split() for line in lines if line.strip()]
+            dates = {datetime.date.fromisoformat(line[0]): line for line in parts}
+            if self.today in dates:
+                return int(dates[self.today][1])
+        except FileNotFoundError:
+            pass
+        return 0
 
-def toggle():
-    global running
-    if running:
-        running = False
-        start.configure(text="START")
-    else:
-        running = True
-        entry.place_forget()
-        label.place(relx=0.5, rely=0.5, anchor=customtkinter.CENTER)
-        start.configure(text="PAUSE")
-        timer()
+    def _save_pomodoro_count(self):
+        with open('pomodoros.txt', 'w') as f:
+            f.write(f'{self.today} {self.pomodoro_val}')
 
-def switch():
-    global num, switched, extent, update
-    if not switched:
-        switched = True
+    def _save_session_to_options(self, duration):
+        with open('options.txt', 'a') as f:
+            f.write(f'Date: {self.today} for {duration} seconds!\n')
+
+    def _load_recent_sessions(self):
         try:
-            num = int(entry.get())
+            with open('options.txt', 'r') as f:
+                return f.read()
+        except FileNotFoundError:
+            return "No sessions recorded yet."
+
+    def timer(self):
+        if self.running and self.num != 0:
+            self.label.configure(text=self.num)
+            self.num -= 1
+            self.canvas.itemconfig(self.arc, extent=self.extent)
+            self.extent -= self.update_step
+            self.root.after(1000, self.timer)
+        elif self.running and self.num == 0:
+            self._on_timer_complete()
+
+    def _on_timer_complete(self):
+        self.running = False
+        self.canvas.itemconfig(self.arc, extent=0)
+        self.label.configure(text=0)
+        self.start.configure(text="START")
+
+        if winsound:
+            winsound.Beep(1000, 300)
+            winsound.Beep(1000, 300)
+
+        self.pomodoro_val += 1
+        self._save_pomodoro_count()
+        self.pomodoro.configure(
+            text=f"Today's completed Pomodoros: {self.pomodoro_val} Pomodoros!",
+            font=("Helvetica", 20)
+        )
+
+        try:
+            duration = int(self.entry.get())
+            self._save_session_to_options(duration)
         except ValueError:
-            entry.configure(placeholder_text='Enter a number!')
+            self.entry.configure(placeholder_text='Enter a number!')
             return
+
+        self.label.place_forget()
+        self.entry.place(relx=0.5, rely=0.5, anchor=customtkinter.CENTER)
+        self.switched = False
+
+    def toggle(self):
+        if self.running:
+            self.running = False
+            self.start.configure(text="START")
         else:
-            extent = 359 #customtkinter can't process 360 degrees for some reason
-            update = extent / num #The value in degrees of how much the blue progress bar should be shortened
-            label.configure(text=num)
-    toggle()
+            self.running = True
+            self.entry.place_forget()
+            self.label.place(relx=0.5, rely=0.5, anchor=customtkinter.CENTER)
+            self.start.configure(text="PAUSE")
+            self.timer()
 
-def reset():
-    global num, running, switched
-    running = False
-    switched = False
-    label.place_forget()
-    entry.place(relx=0.5, rely=0.5, anchor=customtkinter.CENTER)
-    start.configure(text="START")
-    canvas.itemconfig(arc, extent=0)
+    def switch(self):
+        if not self.switched:
+            self.switched = True
+            try:
+                self.num = int(self.entry.get())
+            except ValueError:
+                self.entry.configure(placeholder_text='Enter a number!')
+                return
+            self.extent = 359  # CustomTkinter can't process 360 degrees
+            self.update_step = self.extent / self.num
+            self.label.configure(text=self.num)
+        self.toggle()
 
-def option(): #Right now the recent tab isn't a part of the frame. You won't notice while testing, but it's not looking quite well
-    global menu, optframe
-    if menu:
-        menu = False
-        optframe.place_forget()
-        optbutton.place_forget()
-    else:
-        menu = True
-        optframe.place(relx=0.75, rely=0.58, anchor=customtkinter.CENTER)
-        optbutton.place(relx=0.75, rely=0.3, anchor=customtkinter.CENTER)
-        
-def recent(): #Right now the recent tab isn't a part of the frame. You won't notice while testing, but it's not looking quite well
-    global rlines
-    with open('options.txt', 'r') as r:
-        rlines = str(r.read())
-        optlabel.configure(text=rlines, font=("Helvetica", 10))
-    if menu:
-        optbutton.place_forget()
-        optlabel.place(relx=0.75, rely=0.5, anchor=customtkinter.CENTER)
+    def reset(self):
+        self.running = False
+        self.switched = False
+        self.label.place_forget()
+        self.entry.place(relx=0.5, rely=0.5, anchor=customtkinter.CENTER)
+        self.start.configure(text="START")
+        self.canvas.itemconfig(self.arc, extent=0)
 
-canvas = Canvas(root, width=200, height=200, bg="#252525", highlightthickness=0)
-canvas.place(relx=0.5, rely=0.5, anchor=customtkinter.CENTER)
+    def option(self):
+        if self.menu:
+            self.menu = False
+            self.optframe.place_forget()
+            self.optbutton.place_forget()
+            self.optpref.place_forget()
+            self.optboxd.place_forget()
+            self.optboxl.place_forget()
+        else:
+            self.menu = True
+            self.optframe.place(relx=0.75, rely=0.58, anchor=customtkinter.CENTER)
+            self.optbutton.place(relx=0.75, rely=0.3, anchor=customtkinter.CENTER)
+            self.optpref.place(relx=0.75, rely=0.5, anchor=customtkinter.CENTER)
 
-entry = customtkinter.CTkEntry(root, placeholder_text='Enter', font=("Helvetica", 50))
-label = customtkinter.CTkLabel(root, text="", font=("Helvetica", 50))
-opt = customtkinter.CTkButton(root, text='☰', width=50, height=50, command=option)
-start = customtkinter.CTkButton(root, text="START", width=100, height=50, command=switch)
-stop = customtkinter.CTkButton(root, text="RESET", width=100, height=50, command=reset)
-pomodoro = customtkinter.CTkLabel(root, text=f"Today's completed Pomodoros: {pomodoro_val} Pomodoros!", font=("Helvetica", 20))
+    def recent(self):
+        sessions = self._load_recent_sessions()
+        self.optlabel.configure(text=sessions, font=("Helvetica", 10))
+        if self.menu:
+            self.optbutton.place_forget()
+            self.optlabel.place(relx=0.75, rely=0.5, anchor=customtkinter.CENTER)
 
-optframe = customtkinter.CTkFrame(root, bg_color='#2b2b2b', width=290, height=320)
-optbutton = customtkinter.CTkButton(root, text="Recent Pomodoros", width=260, height=50, command=recent)
-optlabel = customtkinter.CTkLabel(root, bg_color='#2b2b2b')
+    def preferences(self):
+        if self.menu:
+            self.optpref.place_forget()
+            self.optbutton.place_forget()
+            self.optboxl.place(relx=0.75, rely=0.3, anchor=customtkinter.CENTER)
+            self.optboxd.place(relx=0.75, rely=0.4, anchor=customtkinter.CENTER)
+        else:
+            self.optboxd.place_forget()
+            self.optboxl.place_forget()
 
-# Draw background ring (grey)
-canvas.create_oval(10, 10, 190, 190, outline='#3a3a3a', width=12)
+    def dark(self):
+        if self.optboxl.get() == 1:
+            self.optboxl.deselect()
+            customtkinter.set_appearance_mode("dark")
+            self.canvas_bg = "#252525"
+            self.opt_bg = "#2b2b2b"
+            self._apply_theme()
+        elif self.optboxd.get() == 0:
+            self.optboxd.select()
 
-# Draw progress arc (blue)
-arc = canvas.create_arc(10, 10, 190, 190, start=90, extent=360, outline='#3b8ed0', width=12, style='arc')
+    def light(self):
+        if self.optboxd.get() == 1:
+            self.optboxd.deselect()
+            customtkinter.set_appearance_mode("light")
+            self.canvas_bg = "#ECECEC"
+            self.opt_bg = "#DBDBDB"
+            self._apply_theme()
+        elif self.optboxl.get() == 0:
+            self.optboxl.select()
 
-opt.place(relx=0.9, rely=0.1, anchor=customtkinter.CENTER)
-pomodoro.place(relx=0.5, rely=0.1, anchor=customtkinter.CENTER)
-start.place(relx=0.5, rely=0.9, anchor=customtkinter.CENTER)
-stop.place(relx=0.75, rely=0.9, anchor=customtkinter.CENTER)
-label.place(relx=0.5, rely=0.5, anchor=customtkinter.CENTER)
-entry.place(relx=0.5, rely=0.5, anchor=customtkinter.CENTER)
+    def _apply_theme(self):
+        self.canvas.configure(background=self.canvas_bg)
+        self.optboxd.configure(bg_color=self.opt_bg)
+        self.optboxl.configure(bg_color=self.opt_bg)
 
-label.place_forget()
-optframe.place_forget()
+    def _setup_canvas(self):
+        self.canvas = Canvas(
+            self.root, width=200, height=200,
+            bg=self.canvas_bg, highlightthickness=0
+        )
+        self.canvas.place(relx=0.5, rely=0.5, anchor=customtkinter.CENTER)
 
-root.mainloop()
+        self.canvas.create_oval(10, 10, 190, 190, outline='#3a3a3a', width=12)
+
+        self.arc = self.canvas.create_arc(
+            10, 10, 190, 190,
+            start=90, extent=360,
+            outline='#3b8ed0', width=12, style='arc'
+        )
+
+    def _setup_widgets(self):
+        self.entry = customtkinter.CTkEntry(
+            self.root, placeholder_text='Enter', font=("Helvetica", 50)
+        )
+        self.label = customtkinter.CTkLabel(
+            self.root, text="", font=("Helvetica", 50)
+        )
+        self.opt = customtkinter.CTkButton(
+            self.root, text='☰', width=50, height=50, command=self.option
+        )
+        self.start = customtkinter.CTkButton(
+            self.root, text="START", width=100, height=50, command=self.switch
+        )
+        self.stop = customtkinter.CTkButton(
+            self.root, text="RESET", width=100, height=50, command=self.reset
+        )
+        self.pomodoro = customtkinter.CTkLabel(
+            self.root,
+            text=f"Today's completed Pomodoros: {self.pomodoro_val} Pomodoros!",
+            font=("Helvetica", 20)
+        )
+        self.quote = customtkinter.CTkLabel(self.root, text=self.quo)
+
+        self.optframe = customtkinter.CTkFrame(
+            self.root, bg_color='#2b2b2b', width=290, height=320
+        )
+        self.optbutton = customtkinter.CTkButton(
+            self.root, text="Recent Pomodoros", width=260, height=50, command=self.recent
+        )
+        self.optpref = customtkinter.CTkButton(
+            self.root, text='Preferences', width=260, height=50, command=self.preferences
+        )
+        self.optlabel = customtkinter.CTkLabel(self.root, bg_color='#2b2b2b')
+        self.optboxl = customtkinter.CTkCheckBox(
+            self.root, text='Light mode', bg_color=self.opt_bg, command=self.light
+        )
+        self.optboxd = customtkinter.CTkCheckBox(
+            self.root, text='Dark mode', bg_color=self.opt_bg, command=self.dark
+        )
+
+    def _place_widgets(self):
+        self.opt.place(relx=0.9, rely=0.1, anchor=customtkinter.CENTER)
+        self.pomodoro.place(relx=0.5, rely=0.1, anchor=customtkinter.CENTER)
+        self.start.place(relx=0.5, rely=0.9, anchor=customtkinter.CENTER)
+        self.stop.place(relx=0.75, rely=0.9, anchor=customtkinter.CENTER)
+        self.label.place(relx=0.5, rely=0.5, anchor=customtkinter.CENTER)
+        self.entry.place(relx=0.5, rely=0.5, anchor=customtkinter.CENTER)
+        self.quote.place(relx=0.5, rely=0.2, anchor=customtkinter.CENTER)
+
+        self.label.place_forget()
+        self.optframe.place_forget()
+
+        # Default to dark mode
+        self.optboxd.select()
+
+
+if __name__ == "__main__":
+    root = customtkinter.CTk()
+    app = PomodoroApp(root)
+    root.mainloop()
